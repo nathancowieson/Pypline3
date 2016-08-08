@@ -1,0 +1,4 @@
+[console_scripts]
+nxstack = nexusformat.scripts.nxstack:main
+nxstartserver = nexusformat.pyro.start_server:main
+

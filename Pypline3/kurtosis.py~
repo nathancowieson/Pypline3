@@ -1,0 +1,17 @@
+from scipy.stats import kurtosistest
+
+from raw_dat import RawDat
+
+files = [ '/dls/b21/data/2016/sw14620-1/processed/b21-59143.unsub/b21-59143_sample_0.dat', '/dls/b21/data/2016/sw14620-1/processed/b21-59143.unsub/b21-59143_sample_1.dat', '/dls/b21/data/2016/sw14620-1/processed/b21-59143.unsub/b21-59143_sample_2.dat', '/dls/b21/data/2016/sw14620-1/processed/b21-59143.unsub/b21-59143_sample_3.dat', '/dls/b21/data/2016/sw14620-1/processed/b21-59143.unsub/b21-59143_sample_4.dat', '/dls/b21/data/2016/sw14620-1/processed/b21-59143.unsub/b21-59143_sample_5.dat' ]
+
+reference = 0
+for myfile in files:
+    mydat = RawDat(myfile)
+    if reference == 0:
+        reference = mydat.ReturnColumn('I')
+    target = mydat.ReturnColumn('I')
+    difference = []
+    for index, n in enumerate(target):
+        difference.append(n - reference[index])
+    print kurtosistest(difference)
+    

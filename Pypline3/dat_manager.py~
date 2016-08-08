@@ -1,0 +1,296 @@
+#!/home/b21user/nathanc/Pypline3/bin/python
+'''
+Created on Mar 16th, 2016
+
+@author: nathan
+'''
+from logger import myLogger
+import numpy
+import os.path
+import re
+from scipy.stats import kurtosistest
+import yaml
+
+class DatManager(object):
+    """Take ParseNXS objects and handle averaging and subtracting
+    
+    The class is instantiated without any arguments and ParseNXS objects
+    are added as the come in. The DatManager tries to work out when to
+    average files together and what to subtract from what.
+    """
+    
+    '''
+    Constructor
+    '''
+    def __init__(self):
+        ###import config file
+        self.pypline_dir = os.path.dirname(os.path.realpath(__file__))
+        with open(self.pypline_dir+'/config.yaml', 'r') as ymlfile:
+            self.myconfig = yaml.load(ymlfile)
+
+        ###connect to the logger
+        self.logger = myLogger(os.path.basename(__file__))
+
+        ###set some parameters
+        self.buffers = []
+        self.samples = []
+        self.previous_scan_type = None
+        self.previous_scan_name = None
+        self.type = 'dat_manager'
+
+    def AddParsedNXS(self, parsednxs):
+        return_type = ''
+        try:
+            if not parsednxs.type == 'nxs':
+                raise TypeError('DatManager.AddParsedNXS needs a ParsedNXS object')
+            ############################
+            ##    A ROBOT BUFFER      ##
+            ############################
+            if parsednxs.scan_type == 'Robot Buffer': 
+                ##############################
+                ##    A REPEAT ROBOT BUFFER ##
+                ##############################
+                if self.previous_scan_type == 'Robot Sample': #A BUFFER AFTER A ROBOT SAMPLE MEANS A REPEAT BUFFER
+                    self.logger.info('Detected a repeat buffer, adding to current buffers')
+                    if len(self.buffers) > 0:
+                        #IF THE BUFFER IS THE SAME MERGE IT AND REBLANK PREVIOUS SAMPLES
+                        if self.TestKurtosis(self.buffers[0], parsednxs):
+                            self.buffers.append(parsednxs)
+                            return_type = 'repeat robot buffer'
+                        #IF IT HAS CHANGED THEN TREAT AS A NEW BUFFER
+                        else:
+                            self.logger.info('repeat buffer is different to previous, treating this as a new buffer')
+                            self.FlushBuffers() #GET RID OF PREVIOUS BUFFERS
+                            self.FlushSamples() #WE WONT BE REBLANKING PREVIOUS SAMPLES
+                            self.buffers.append(parsednxs)
+                            return_type = 'new buffer'
+                    else:
+                        #IF THERE ARE NO CURRENT BUFFERS... THIS SHOULDNT HAPPEN
+                        self.logger.error('found a repeat robot buffer but there were no buffers in memory!')
+                        self.FlushBuffers() #GET RID OF PREVIOUS BUFFERS
+                        self.FlushSamples() #WE WONT BE REBLANKING PREVIOUS SAMPLES
+                        self.buffers.append(parsednxs)
+                        return_type = 'new buffer'
+
+                ##############################
+                ##    A NEW ROBOT BUFFER    ##
+                ##############################
+                else: #A ROBOT BUFFER AFTER ANYTHING BUT A ROBOT SAMPLE IS A NEW BUFFER
+                    self.logger.info('Detected a new robot buffer, flushing previous buffers and samples.')
+                    self.FlushBuffers() #GET RID OF PREVIOUS BUFFERS
+                    self.FlushSamples() #WE WONT BE REBLANKING PREVIOUS SAMPLES
+                    self.buffers.append(parsednxs)
+                    return_type = 'new buffer'
+
+            ############################
+            ##    A ROBOT SAMPLE      ##
+            ############################
+            elif parsednxs.scan_type == 'Robot Sample':
+                self.logger.info('Detected a new robot sample, averaging and blanking')
+                self.samples.append(parsednxs)
+                return_type = 'new robot sample'
+
+            ############################
+            ##     A SEC BUFFER       ##
+            ############################
+            elif parsednxs.scan_type == 'SEC Buffer':
+                ############################
+                ##  A REPEAT SEC BUFFER   ##
+                ############################
+                if self.previous_scan_type == parsednxs.scan_type and self.previous_scan_name == parsednxs.descriptive_title:
+                    self.logger.info('Detected a repeat SEC buffer')
+                    if len(self.buffers) > 0:
+                        #IF THE BUFFER IS THE SAME MERGE IT
+                        if self.TestKurtosis(self.buffers[0], parsednxs):
+                            self.buffers.append(parsednxs)
+                            return_type = 'repeat sec buffer'
+                        #IF IT HAS CHANGED THEN DISCARD IT
+                        else:
+                            return_type = 'non-matching sec buffer'
+                    else:
+                        #IF THERE ARE NO CURRENT BUFFERS... THIS SHOULDNT HAPPEN
+                        self.logger.error('found a repeat sec buffer but there were no buffers in memory!')
+                        self.FlushBuffers() #GET RID OF PREVIOUS BUFFERS
+                        self.FlushSamples() #WE WONT BE REBLANKING PREVIOUS SAMPLES
+                        self.buffers.append(parsednxs)
+                        return_type = 'new buffer'
+            
+                    #TRIM THE BUFFER WINDOW TO THE RIGHT SIZE
+                    while len(self.buffers) > self.myconfig['dat_data']['sec_buffer_window_size']:
+                        del self.buffers[0]
+                ############################
+                ##    A NEW SEC BUFFER    ##
+                ############################
+                else:
+                    self.logger.info('Detected a buffer shot for a new SEC run')
+                    self.FlushBuffers() #GET RID OF PREVIOUS BUFFERS
+                    self.FlushSamples() #WE WONT BE REBLANKING PREVIOUS SAMPLES
+                    self.buffers.append(parsednxs)
+                    return_type = 'new buffer'
+
+            ############################
+            ##     A SEC SAMPLE       ##
+            ############################
+            elif parsednxs.scan_type == 'SEC Sample':
+                self.logger.info('Detected a new SEC sample, blanking')
+                self.FlushSamples()
+                self.samples.append(parsednxs)
+                return_type = 'new sec sample'
+
+            ############################
+            ## A MANUAL SHOT OR SCAN  ##
+            ############################
+            else:
+                self.logger.info('Instrument scan or manual collection, will ignore')
+                return_type = 'manual collection or scan'
+
+            self.previous_scan_type = parsednxs.scan_type
+            self.previous_scan_name = parsednxs.descriptive_title
+            return return_type
+
+
+            
+
+        except Exception as ex:
+            template = "An exception of type {0} occured. {1!r}"
+            message = template.format(type(ex).__name__, ex.args)
+            self.logger.error(message)
+            return False        
+
+    def TestKurtosis(self, reference_nxs_instance, target_nxs_instance):
+        #goes through the dat instances within each nexus file and compares each with each
+        #as soon as it finds a single pair of files that match it returns true. Once you
+        #get to averaging there will be outlier rejection
+        self.logger.info('testing kurtosis')
+        try:
+            something_matches = False
+            for first_dat_instance in reference_nxs_instance.dat_data:
+                for second_dat_instance in target_nxs_instance.dat_data:
+                    distribution = []
+                    if first_dat_instance.dat_dict['Q'] == second_dat_instance.dat_dict['Q']:
+                        for index in range(0,len(first_dat_instance.dat_dict['Q'])):
+                            distribution.append( first_dat_instance.dat_dict['I'][index] / second_dat_instance.dat_dict['I'][index] )
+                        if kurtosistest(distribution)[1] > 0.05:
+                            something_matches = True
+                            break
+            return something_matches
+        except:
+            return False
+
+    def FlushBuffers(self):
+        self.buffers = []
+
+    def FlushSamples(self):
+        self.samples = []
+
+    def AverageDatFiles(self, nxs_set = 'buffers'):
+        sql_dict = { 'averaging_instance': [], 'av_dat': [] }
+        dat_dict = {'Q': [], 'I': [], 'E': [], 'headers': [], 'output_name': None}
+        dat_dict['headers'].append('# Diamond Light Source Ltd.')
+        dat_dict['headers'].append('# Averaged/unblanked data produced by the B21 automated Pypline')
+        output_prefix = None
+        try:
+            averaging_array = {}
+            if nxs_set == 'buffers':
+                nxs_set = self.buffers
+            elif nxs_set == 'samples':
+                nxs_set = self.samples
+            else:
+                try:
+                    if nxs_set.type == 'nxs':
+                        nxs_set = [ nxs_set ]
+                    else:
+                        raise TypeError("AverageDatFiles function takes objects of type 'nxs' not "+nxs_set.type)
+                except:
+                    raise TypeError("AverageDatFiles takes argument 'buffers' or 'samples' or a parsed nxs instance")
+
+            
+            if len(nxs_set) < 1:
+                raise IndexError("No nxs files in the buffer or sample arrays")
+            ####GO THROUGH ALL DAT INSTANCES ONCE AND WORK OUT REJECTION CRITERIA FOR OUTLIERS
+            lo_qs = []
+            hi_qs = []
+            indeces = []
+            for parsednxs in nxs_set:
+                if output_prefix == None:
+                    output_prefix = re.split('\d{'+str(self.myconfig['settings']['number_digits_in_output_index'])+'}-\d{'+str(self.myconfig['settings']['number_digits_in_output_index'])+'}', parsednxs.ReturnFilename('av_dat'))
+                if len(parsednxs.dat_data) < 1:
+                    raise IndexError("There are no dat files in the nxs instance")
+                for dat_instance in parsednxs.dat_data:
+                    lo_qs.append(dat_instance.dat_dict['low_q_window'])
+                    hi_qs.append(dat_instance.dat_dict['high_q_window'])
+                    indeces.append(dat_instance.outindex)
+            low_q_target = min(lo_qs)
+            high_q_target = max(hi_qs)
+            if min(indeces) == max(indeces):
+                indeces = str(min(indeces))
+            else:
+                indeces = str(min(indeces))+'-'+str(max(indeces))
+            dat_dict['output_name'] = output_prefix[0]+indeces+output_prefix[-1]
+            ####GO THROUGH ALL DAT INSTANCES A SECOND TIME AND DO THE AVERAGING
+            total = 0
+            is_good = 0
+            my_qs = None
+            my_is = []
+            my_es = []
+            dat_data = {}
+            used_files = []
+            for parsednxs in nxs_set:
+                for dat_instance in parsednxs.dat_data:
+                    total += 1
+                    if dat_instance.dat_dict['high_q_window'] >= high_q_target * self.myconfig['dat_data']['highq_deadband'] :
+                        if dat_instance.dat_dict['low_q_window'] <= low_q_target * self.myconfig['dat_data']['lowq_deadband']:
+                            used_files.append(os.path.split(dat_instance.outname)[-1])
+                            is_good += 1
+                            sql_dict['averaging_instance'].append( (None, 1, dat_instance.ReturnFilename(), dat_dict['output_name']) )
+                            for index, q in enumerate(dat_instance.dat_dict['Q']):
+                                if q in dat_data.keys():
+                                    dat_data[q][0].append(dat_instance.dat_dict['I'][index])
+                                    dat_data[q][1].append(dat_instance.dat_dict['E'][index])
+                                else:
+                                    dat_data[q] = ( [ dat_instance.dat_dict['I'][index] ], [ dat_instance.dat_dict['E'][index] ] )
+                        else:
+                            sql_dict['averaging_instance'].append( (None, 0, dat_instance.ReturnFilename(), dat_dict['output_name']) )
+                    else:
+                        sql_dict['averaging_instance'].append( (None, 0, dat_instance.ReturnFilename(), dat_dict['output_name']) )
+            for q in sorted(dat_data.keys()):
+                dat_dict['Q'].append(q)
+                dat_dict['I'].append( numpy.average( dat_data[q][0] ) )
+                dat_dict['E'].append( numpy.sqrt( sum( [numpy.power(n, 2) for n in dat_data[q][1]]) / len(dat_data[q][1])) )
+            if is_good == 0:
+                accepted_files = 0
+            else:
+                accepted_files = total/float(is_good)
+            sql_dict['av_dat'] = [ ( dat_dict['output_name'], total, accepted_files ) ]
+            dat_dict['headers'].append('#'+','.join(used_files))
+            return ( dat_dict, sql_dict )
+                            
+        except Exception as ex:
+            template = "An exception of type {0} occured. {1!r}"
+            message = template.format(type(ex).__name__, ex.args)
+            self.logger.error(message)
+            return False                    
+
+        
+        
+if __name__ == '__main__':
+    from raw_dat import RawDat
+    from database import Database
+    from visit_id import VisitID
+    from nxs import ParseNXS
+    dat_manager = DatManager()
+    visit = VisitID('sw14620-1')
+    database = Database()
+    robot_buffer = '/dls/b21/data/2016/sw14620-1/b21-59102.nxs'
+    robot_sample = '/dls/b21/data/2016/sw14620-1/b21-59103.nxs'
+    parsednxs = ParseNXS(database, visit, robot_buffer)
+    for datfile in parsednxs.ReturnDatFiles():
+        parsednxs.AddDatData(RawDat(datfile))
+    dat_manager.AddParsedNXS(parsednxs)
+    print dat_manager.AverageDatFiles('buffers')
+    #parsednxs = ParseNXS(database, visit, robot_sample)
+    #dat_manager.AddParsedNXS(parsednxs)
+    print 'finished cleanly'
+
+
+         
