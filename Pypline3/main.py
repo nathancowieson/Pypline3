@@ -136,9 +136,9 @@ while polling:
     
             elif kind_of_sample == 'repeat sec buffer': 
                 log.info('Repeat SEC buffer detected, added to buffers in memory')
-                buffers.AddParsedNXS(parsednxs)
-                buffers.RejectOutliers()
-                buffers.LimitToWindowSize()
+                if buffers.TestSimilar(parsednxs.dat_data[0].ReturnColumn('I')):
+                    buffers.AddParsedNXS(parsednxs)
+                    buffers.LimitToWindowSize()
     
             elif kind_of_sample == 'new sec sample':
                 log.info('found a new SEC sample')
