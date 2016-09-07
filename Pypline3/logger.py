@@ -8,6 +8,7 @@ Created on Mar 14th, 2016
 import logging
 import yaml
 import os.path
+from logging.handlers import TimedRotatingFileHandler
 
 class myLogger(object):
     """Create a logger object for all the Pypline3 classes
@@ -30,7 +31,8 @@ class myLogger(object):
         self.logger.setLevel(logging.INFO)
         #formatter = logging.Formatter('%(asctime)s: %(levelname)s: %(module)s: %(message)s',"[%Y-%m-%d %H:%M:%S]")
         formatter = logging.Formatter('%(asctime)s: %(levelname)s: '+str(calling_module)+': %(message)s',"[%Y-%m-%d %H:%M:%S]")
-        filehandler = logging.FileHandler(self.myconfig['setup']['logfile'])
+        #the timed file handler will rotate to a new log file every 8 hours and keep 6 files i.e. 2 days
+        filehandler = TimedRotatingFileHandler(self.myconfig['setup']['logfile'], when='D', interval=8, backupCount=6)
         filehandler.setFormatter(formatter)
         streamhandler = logging.StreamHandler()
         streamhandler.setFormatter(formatter)
@@ -40,6 +42,9 @@ class myLogger(object):
 
     def info(self, message='info log entry with no message'):
         self.logger.info(message)
+
+    def debug(self, message='debug log entry with no message'):
+        self.logger.debug(message)
 
     def error(self, message='error log entry with no message'):
         self.logger.error(message)
