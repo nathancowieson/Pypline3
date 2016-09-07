@@ -87,9 +87,21 @@ class Averaging(object):
                 return 1
             if not len(self.intensities_dict.keys()) == len(intensities_array):
                 raise IndexError('averaging:TestSimilar had different q values in the test file compared to the averaged set')
+            #restrict Q range
+            lo_q = 0.02
+            hi_q = 0.2
+            lo_index = 0
+            hi_index = 0
+            for index, q in enumerate(sorted(self.intensities_dict.keys())):
+                if q < lo_q:
+                    lo_index = index
+                if q < hi_q:
+                    hi_index = index
+
             reference = self.ReturnMedianI()
-            ttest = ttest_ind(intensities_array, reference)
-            if ttest[1] <= 0.96:
+            ttest = ttest_ind(intensities_array[lo_index:hi_index], reference[lo_index:hi_index])
+            self.logger.debug('T-test score: '+str(ttest[1]))
+            if ttest[1] <= 0.8:
                 self.logger.info('repeat sec buffer seems to be different')
                 return 0
             else:
@@ -116,7 +128,7 @@ class Averaging(object):
             if not parsednxs.type == 'nxs':
                 raise TypeError('Averaging.AddParsedNXS needs a ParsedNXS object')
             self.parsednxs_list.append(parsednxs)
-            self.logger.info('Adding a parsednxs object to averaging class with '+str(len(parsednxs.ReturnDatInstances()))+' dat objects')
+            self.logger.info('Adding a parsednxs object with '+str(len(parsednxs.ReturnDatInstances()))+' dat objects to averaging class.')
             for dat_object in parsednxs.ReturnDatInstances():
                 self.dat_instances.append(dat_object)
                 #self.is_good.append(self.TestSimilar(dat_object.ReturnColumn('I')))
