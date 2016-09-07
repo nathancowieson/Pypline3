@@ -117,7 +117,7 @@ class VisitID(object):
                 self.logger.info('Making directory: '+directory)
                 os.mkdir(directory)
             else:
-                self.logger.info('Directory already exists: '+directory)
+                self.logger.debug('Directory already exists: '+directory)
             return True
         except Exception as ex:
             template = "An exception of type {0} occured. {1!r}"
@@ -127,8 +127,8 @@ class VisitID(object):
 
 if __name__ == '__main__':
     job = VisitID()
-    print job.ReturnVisitID()
-    print job.ReturnSQLDict()
-    job.MakeOutputDirs()
+    print 'current visit: '+str(job.ReturnVisitID())
+
+
 
         
