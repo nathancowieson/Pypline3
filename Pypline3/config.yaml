@@ -23,4 +23,4 @@ dat_data:
     highq_hi: 0.990
     lowq_deadband: 1.02
     highq_deadband: 0.95
-    sec_buffer_window_size: 11
+    sec_buffer_window_size: 21
