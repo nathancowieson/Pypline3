@@ -51,14 +51,6 @@ CREATE TABLE av_dat(
     PRIMARY KEY (avdat_file)
 );
 
-drop table if exists subtraction_instance;
-CREATE TABLE subtraction_instance(
-    subtraction_instance integer PRIMARY KEY AUTOINCREMENT,
-    buffer_dat_file text NOT NULL,
-    subdat_file text NOT NULL,
-    FOREIGN KEY (buffer_dat_file) REFERENCES av_dat(avdat_file),
-    FOREIGN KEY (subdat_file) REFERENCES sub_dat(subdat_file)
-);
 
 drop table if exists sub_dat;
 CREATE TABLE sub_dat(

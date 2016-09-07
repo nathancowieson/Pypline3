@@ -45,7 +45,7 @@ class Averaging(object):
         self.is_good = []
         self.errors_dict = {}
         self.indeces = []
-        self.type = 'dat_manager'
+        self.type = 'averaging'
 
     def LimitToWindowSize(self, window_size=0):
         try:
@@ -55,7 +55,7 @@ class Averaging(object):
                 window_size = int(window_size)
             limited = False
             if not type(window_size) == type(1):
-                TypeError('averaging:LimitToWindowSize needs an integer')
+                raise TypeError('averaging:LimitToWindowSize needs an integer')
             arrays_to_limit = [self.lo_qs, self.hi_qs, self.dat_instances, self.is_good, self.indeces]
             for q in self.intensities_dict.keys():
                 arrays_to_limit.append(self.intensities_dict[q])
@@ -183,8 +183,12 @@ class Averaging(object):
             self.logger.error(message)
             return False
 
+    def FlushDatDict(self):
+        self.dat_dict = {'Q': [], 'I': [], 'E': [], 'headers': [], 'output_name': None}
+
     def Average(self):
         try:
+            self.FlushDatDict()
             if len(self.dat_instances) < 1:
                 raise IndexError('Averaging tried to average with no dat files in it')
             output_prefix = re.split('\d{'+str(self.myconfig['settings']['number_digits_in_output_index'])+'}-\d{'+str(self.myconfig['settings']['number_digits_in_output_index'])+'}', self.parsednxs_list[0].ReturnFilename('av_dat'))
@@ -217,7 +221,7 @@ class Averaging(object):
             message = template.format(type(ex).__name__, ex.args)
             message = fname+', line: '+str(line_no)+': '+message
             self.logger.error(message)
-            return False
+            return ({}, {})
                     
                 
         

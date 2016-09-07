@@ -9,6 +9,8 @@ from nxs import ParseNXS
 from raw_dat import RawDat
 from dat_manager import DatManager
 from averaging import Averaging
+from subtract import Subtraction
+
 #START A LOG FILE
 log = myLogger(os.path.basename(__file__))
 
@@ -64,18 +66,25 @@ for nxsfile in sorted( list( set(files.ReturnNxsFiles()) - set(database.ReturnVi
 
         elif kind_of_sample == 'repeat robot buffer':
             buffers.AddParsedNXS(parsednxs)
-            #average the buffers
-            buffers.RejectOutliers()
-            av_buffer = buffers.Average()
-            database.insertData(av_buffer[1])
-            database.SaveDatFile(av_buffer[0])
-            #average the samples
-            for sample in samples:
-                sample.RejectOutliers()
-                av_sample = sample.Average()
-                database.insertData(av_sample[1])
-                database.SaveDatFile(av_sample[0])
-                #subtract each sample in memory
+            if len(samples) > 0:
+                #average the buffers
+                buffers.RejectOutliers()
+                av_buffer = buffers.Average()
+                database.insertData(av_buffer[1])
+                database.SaveDatFile(av_buffer[0])
+                #average the samples
+                for sample in samples:
+                    sample.RejectOutliers()
+                    av_sample = sample.Average()
+                    database.insertData(av_sample[1])
+                    database.SaveDatFile(av_sample[0])
+                    #subtract new buffer from sample
+                    subtraction = Subtraction()
+                    subtraction.AddSample(sample)
+                    subtraction.AddBuffer(buffers)
+                    sub_sample = subtraction.Subtract()
+                    database.insertData(sub_sample[1])
+                    database.SaveDatFile(sub_sample[0])
 
         elif kind_of_sample == 'new robot sample':
             log.info('found a robot sample')
@@ -93,32 +102,49 @@ for nxsfile in sorted( list( set(files.ReturnNxsFiles()) - set(database.ReturnVi
             database.insertData(av_sample[1])
             database.SaveDatFile(av_sample[0])
             #subtract THIS sample
+            subtraction = Subtraction()
+            subtraction.AddSample(sample)
+            subtraction.AddBuffer(buffers)
+            sub_sample = subtraction.Subtract()
+            database.insertData(sub_sample[1])
+            database.SaveDatFile(sub_sample[0])
 
         elif kind_of_sample == 'repeat sec buffer': 
             log.info('Repeat SEC buffer detected, added to buffers in memory')
             buffers.AddParsedNXS(parsednxs)
+            buffers.RejectOutliers()
             buffers.LimitToWindowSize()
 
         elif kind_of_sample == 'new sec sample':
             log.info('found a new SEC sample')
             #average the buffers
+            log.info('dealing with buffers first')
             buffers.RejectOutliers()
             av_buffer = buffers.Average()
             database.insertData(av_buffer[1])
             database.SaveDatFile(av_buffer[0])
             #average THIS sample
+            log.info('now dealing with sample')
             sample = Averaging()
             sample.AddParsedNXS(parsednxs)
             sample.RejectOutliers()
             av_sample = sample.Average()
             database.insertData(av_sample[1])
             database.SaveDatFile(av_sample[0])
-
             #subtract EACH INDIVIDUAL dat file in THIS nxs
+            log.info('now subtracting buffer from sample')
+            subtraction = Subtraction()
+            subtraction.AddSample(sample)
+            subtraction.AddBuffer(buffers)
+            sub_sample = subtraction.Subtract()
+            print sub_sample[1]
+            database.insertData(sub_sample[1])
+            database.SaveDatFile(sub_sample[0])
+
         elif kind_of_sample == 'manual collection or scan':
             log.info('manual collection or scan detected, will ignore')
         else:
             log.error('AddParsedNXS returned something unexpected')
 
             
-    dat_manager
+
