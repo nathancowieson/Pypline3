@@ -32,13 +32,14 @@ class myLogger(object):
         #formatter = logging.Formatter('%(asctime)s: %(levelname)s: %(module)s: %(message)s',"[%Y-%m-%d %H:%M:%S]")
         formatter = logging.Formatter('%(asctime)s: %(levelname)s: '+str(calling_module)+': %(message)s',"[%Y-%m-%d %H:%M:%S]")
         #the timed file handler will rotate to a new log file every 8 hours and keep 6 files i.e. 2 days
-        filehandler = TimedRotatingFileHandler(self.myconfig['setup']['logfile'], when='D', interval=8, backupCount=6)
+        filehandler = TimedRotatingFileHandler(self.myconfig['setup']['logfile'], when='H', interval=8, backupCount=6)
         filehandler.setFormatter(formatter)
         streamhandler = logging.StreamHandler()
         streamhandler.setFormatter(formatter)
         if len(self.logger.handlers) == 0:
             self.logger.addHandler(filehandler)
             self.logger.addHandler(streamhandler)
+        self.logger.info('Log file was reinitiated')
 
     def info(self, message='info log entry with no message'):
         self.logger.info(message)
