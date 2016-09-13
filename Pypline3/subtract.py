@@ -178,10 +178,6 @@ class Subtraction(object):
         self.logger.info('Running autorg')
         autorg_executable = 'autorg'
         try:
-            #check that ATSAS is on the path and that there is dat data
-            if subprocess.call(['which', autorg_executable], stderr=subprocess.PIPE, stdout=subprocess.PIPE):
-                raise SystemError('ATSAS needs to be on the path')
-            
             #Run autorg
             if not os.path.isfile(infile_name):
                 time.sleep(1)
@@ -189,7 +185,14 @@ class Subtraction(object):
                     raise SystemError('Cannot run autorg, '+infile_name+' does not exist')
 
             try:
-                autorg_output = subprocess.check_output([autorg_executable, '-f', 'csv', infile_name], stderr=subprocess.PIPE).split('\n')
+                my_env = os.environ.copy()
+                atsas = self.myconfig['setup']['atsas_dir']
+                my_env["ATSAS"] = atsas
+                my_env["PATH"] = atsas + '/bin:' + my_env["PATH"]
+                my_env["LD_LIBRARY_PATH"] = atsas + '/lib64/atsas'
+                child = subprocess.Popen([autorg_executable, '-f', 'csv', infile_name], env=my_env, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+                autorg_output = child.communicate()[0].split('\n')
+                autorg_status = child.returncode
             except:
                 self.logger.info('Could not run autorg, signal too low')
                 autorg_output = []
@@ -229,11 +232,7 @@ class Subtraction(object):
         datgnom_executable = 'datgnom'
         datporod_executable = 'datporod'
 
-        try:
-            #check that ATSAS is on the path and that there is dat data
-            if subprocess.call(['which', datgnom_executable], stderr=subprocess.PIPE, stdout=subprocess.PIPE):
-                raise SystemError('ATSAS needs to be on the path')
-            
+        try:            
             #Run datgnom
             if not os.path.isfile(infile_name):
                 time.sleep(1)
@@ -253,7 +252,14 @@ class Subtraction(object):
             command.append(outfile_name)
             command.append(infile_name)
             try:
-                datgnom_status = subprocess.call([str(x) for x in command], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+                my_env = os.environ.copy()
+                atsas = self.myconfig['setup']['atsas_dir']
+                my_env["ATSAS"] = atsas
+                my_env["PATH"] = atsas + '/bin:' + my_env["PATH"]
+                my_env["LD_LIBRARY_PATH"] = atsas + '/lib64/atsas'
+                child = subprocess.Popen([str(x) for x in command], env=my_env, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+                datgnom_output = child.communicate()[0].split('\n')
+                datgnom_status = child.returncode
             except:
                 self.logger.info('datgnom failed to run, probably too low signal')
                 datgnom_status = 1
@@ -262,7 +268,14 @@ class Subtraction(object):
                 #Run datporod
                 command = [datporod_executable, outfile_name]
                 try:
-                    datporod_output = subprocess.check_output(command, stderr=subprocess.PIPE).split()
+                    my_env = os.environ.copy()
+                    atsas = self.myconfig['setup']['atsas_dir']
+                    my_env["ATSAS"] = atsas
+                    my_env["PATH"] = atsas + '/bin:' + my_env["PATH"]
+                    my_env["LD_LIBRARY_PATH"] = atsas + '/lib64/atsas'
+                    child = subprocess.Popen(command, env=my_env, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+                    datporod_output = child.communicate()[0].split()
+                    datporod_status = child.returncode
                 except:
                     self.logger.error('Datporod did not run cleanly for some reason')
                     return 0.0
