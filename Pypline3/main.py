@@ -44,6 +44,9 @@ if not os.path.isfile(myconfig['setup']['database']):
     log.info('no database found, starting a new one')
     database.createDatabase()
 
+#AN OBJECT TO HANDLE AVERAGING AND SUBTRACTING
+dat_manager = DatManager()
+
 polling = 1
 while polling:
     #IF POLLING IS NOT SPECIFIED THEN RUN THROUGH ONCE AND STOP
@@ -54,8 +57,10 @@ while polling:
     #DEFINE THE VISIT
     if options.visit_id == 'None':
         visit = VisitID()
+        log.info('Visit automatically set to '+str(visit.ReturnVisitID()))
     else:
         visit = VisitID(options.visit_id)
+        log.info('Visit ID was set manually to '+str(visit.ReturnVisitID()))
     visit.MakeOutputDirs()
     
     #A VARIABLE FOR MAKING DECISIONS ABOUT ROBOT BUFFERS
@@ -69,11 +74,8 @@ while polling:
     #CONNECT TO THE FILE SYSTEM
     files = PollFileSystem(visit)
     
-    #AN OBJECT TO HANDLE AVERAGING AND SUBTRACTING
-    dat_manager = DatManager()
-    
     #PARSE THE NEW NXS FILES
-    nxsfiles = sorted( list( set(files.ReturnNxsFiles()) - set(database.ReturnVisitNxsFiles(visit)) ) )[17:]
+    nxsfiles = sorted( list( set(files.ReturnNxsFiles()) - set(database.ReturnVisitNxsFiles(visit)) ) )
     for nxsfile in nxsfiles:
         log.info('------------NEW NXS------------')
         parsednxs = ParseNXS(database, visit, nxsfile)
@@ -85,11 +87,13 @@ while polling:
                 database.insertData(parsednxs.ReturnSQLDict(datfile))                     # individual dat files
             kind_of_sample = dat_manager.AddParsedNXS(parsednxs)
             if kind_of_sample == 'new buffer':
+                log.info('New buffer detected, clearing buffer and sample arrays.')
                 buffers = Averaging()
                 samples = []
                 buffers.AddParsedNXS(parsednxs)
     
             elif kind_of_sample == 'repeat robot buffer':
+                log.info('Repeat robot buffer detected')
                 buffers.AddParsedNXS(parsednxs)
                 if len(samples) > 0:
                     #average the buffers
