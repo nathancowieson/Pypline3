@@ -62,6 +62,8 @@ CREATE TABLE sub_dat(
     i_zero real,
     volume real,
     mass real ,
+    start_guinier integer,
+    end_guinier integer,
     PRIMARY KEY (subdat_file),
     FOREIGN KEY (sample_file) REFERENCES av_dat(avdat_file),
     FOREIGN KEY (buffer_file) REFERENCES av_dat(avdat_file)
