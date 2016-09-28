@@ -77,8 +77,8 @@ while polling:
     #PARSE THE NEW NXS FILES
     nxsfiles = sorted( list( set(files.ReturnNxsFiles()) - set(database.ReturnVisitNxsFiles(visit)) ) )
     for nxsfile in nxsfiles:
-        log.info('------------NEW NXS------------')
         parsednxs = ParseNXS(database, visit, nxsfile)
+        log.info('------------NEW NXS: '+str(nxsfile)+'------------')
         database.insertData(parsednxs.ReturnSQLDict('nxs'))
         if parsednxs.WaitForDatFiles():
             for datfile in parsednxs.ReturnDatFiles():
