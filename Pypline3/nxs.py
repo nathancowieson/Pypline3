@@ -74,33 +74,39 @@ class ParseNXS(object):
         try:
             if not os.path.isfile(self.nexus_file) and self.nexus_file[-4:] == '.nxs':
                 raise IOError(str(self.nexus_file)+' does not exist or is not of type .nxs')
-            mynxs = nxload(self.nexus_file)
-            self.scan_command = str(mynxs.entry1.scan_command.nxdata)
-            self.file_code = int(mynxs.entry1.entry_identifier.nxdata)
-            self.dat_dir = os.path.dirname(self.nexus_file)+'/'+self.myconfig['settings']['existing_dat_file_directory']+'/'+self.myconfig['settings']['unsub_dir_pre']+str(self.file_code)+self.myconfig['settings']['unsub_dir_post']+'/'
-            self.file_time = dateutil.parser.parse(mynxs.file_time).strftime('%Y/%m/%d_%H:%M:%S')
-            self.visit_id = str(mynxs.entry1.experiment_identifier.nxdata)
-            if self.scan_command == 'static readout':
-                self.descriptive_title = str(mynxs.entry1.title.nxdata)
-                if re.search(self.hplc_pattern, self.descriptive_title):
-                    self.descriptive_title = self.descriptive_title[re.search(self.hplc_pattern, self.descriptive_title).end():]
-                    self.scan_type = 'SEC Buffer'
-                    if re.search(self.hplc_sample_pattern, self.descriptive_title):
-                        self.scan_type = 'SEC Sample'
-                elif re.search(self.robot_buffer_pattern, self.descriptive_title):
-                    self.scan_type = 'Robot Buffer'
-                elif re.search(self.robot_sample_pattern_start, self.descriptive_title) and re.search(self.robot_sample_pattern_end, self.descriptive_title):
-                    start_index = re.search(self.robot_sample_pattern_start, self.descriptive_title).end()
-                    end_index = re.search(self.robot_sample_pattern_end, self.descriptive_title).start()
-                    self.descriptive_title = self.descriptive_title[start_index:end_index]
-                    self.scan_type = 'Robot Sample'
-                else:
-                    self.scan_type = 'Manual'
+            try:
+                mynxs = nxload(self.nexus_file)
+                self.scan_command = str(mynxs.entry1.scan_command.nxdata)
+                self.file_code = int(mynxs.entry1.entry_identifier.nxdata)
+                self.dat_dir = os.path.dirname(self.nexus_file)+'/'+self.myconfig['settings']['existing_dat_file_directory']+'/'+self.myconfig['settings']['unsub_dir_pre']+str(self.file_code)+self.myconfig['settings']['unsub_dir_post']+'/'
+                self.file_time = dateutil.parser.parse(mynxs.file_time).strftime('%Y/%m/%d_%H:%M:%S')
+                self.visit_id = str(mynxs.entry1.experiment_identifier.nxdata)
+                if self.scan_command == 'static readout':
+                    self.descriptive_title = str(mynxs.entry1.title.nxdata)
+                    if re.search(self.hplc_pattern, self.descriptive_title):
+                        self.descriptive_title = self.descriptive_title[re.search(self.hplc_pattern, self.descriptive_title).end():]
+                        self.scan_type = 'SEC Buffer'
+                        if re.search(self.hplc_sample_pattern, self.descriptive_title):
+                            self.scan_type = 'SEC Sample'
+                    elif re.search(self.robot_buffer_pattern, self.descriptive_title):
+                        self.scan_type = 'Robot Buffer'
+                    elif re.search(self.robot_sample_pattern_start, self.descriptive_title) and re.search(self.robot_sample_pattern_end, self.descriptive_title):
+                        start_index = re.search(self.robot_sample_pattern_start, self.descriptive_title).end()
+                        end_index = re.search(self.robot_sample_pattern_end, self.descriptive_title).start()
+                        self.descriptive_title = self.descriptive_title[start_index:end_index]
+                        self.scan_type = 'Robot Sample'
+                    else:
+                        self.scan_type = 'Manual'
 
-                self.outfile_prefix = self.MakeSafeFilename(self.descriptive_title)
-                self.number_of_exposures = int(mynxs.entry1.instrument.detector.count_time.size) 
-                self.exposure_time = float(mynxs.entry1.instrument.detector.count_time[0][0])
-
+                    self.outfile_prefix = self.MakeSafeFilename(self.descriptive_title)
+                    self.number_of_exposures = int(mynxs.entry1.instrument.detector.count_time.size) 
+                    self.exposure_time = float(mynxs.entry1.instrument.detector.count_time[0][0])
+            except:
+                self.logger.error('nxs file: '+str(self.nexus_file)+' could not be parsed')
+                self.descriptive_title = 'ERROR IN NXS FILE'
+                self.scan_type = 'Error'
+                self.file_time = datetime.strftime(datetime.now(), '%Y/%m/%d_%H:%M:%S')
+                self.visit_id = self.visit.ReturnVisitID()
         except Exception as ex:
             template = "An exception of type {0} occured. {1!r}"
             message = template.format(type(ex).__name__, ex.args)
