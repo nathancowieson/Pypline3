@@ -46,6 +46,8 @@ class Subtraction(object):
         self.i_zero = 0.0
         self.volume = 0.0
         self.mass = 0.0
+        self.start_guinier = 1
+        self.end_guinier = 1
         self.sample = None
         self.buffer = None
         self.type = 'subtraction'
@@ -112,7 +114,7 @@ class Subtraction(object):
             self.dat_dict['headers'].append('#Sample file: '+self.sample.dat_dict['output_name'])
             self.dat_dict['headers'].append('#Buffer file: '+self.buffer.dat_dict['output_name'])
 
-            self.sql_dict['sub_dat'].append( (self.dat_dict['output_name'], self.sample.dat_dict['output_name'], self.buffer.dat_dict['output_name'], self.highq_signal, self.rg, self.i_zero, self.volume, self.mass) )
+            self.sql_dict['sub_dat'].append( (self.dat_dict['output_name'], self.sample.dat_dict['output_name'], self.buffer.dat_dict['output_name'], self.highq_signal, self.rg, self.i_zero, self.volume, self.mass, self.start_guinier, self.end_guinier) )
             return( self.dat_dict, self.sql_dict )
 
         except Exception as ex:
@@ -196,7 +198,7 @@ class Subtraction(object):
             except:
                 self.logger.info('Could not run autorg, signal too low')
                 autorg_output = []
-                return ( 0.0, 0.0 )
+                return ( 0.0, 0.0, 1, 1 )
 
             if len(autorg_output) > 1:
                 headers = autorg_output[0].split(',')
@@ -209,7 +211,7 @@ class Subtraction(object):
                         except:
                             self.autorg_data[item] = items[index]
                     try:
-                        return ( self.autorg_data['Rg'], self.autorg_data['I(0)'] )
+                        return ( self.autorg_data['Rg'], self.autorg_data['I(0)'], int(self.autorg_data['First point']), int(self.autorg_data['Last point']) )
                     except:
                         raise KeyError('Rg and I(0) were not in the autorg output')
                 else:
@@ -225,7 +227,7 @@ class Subtraction(object):
             message = template.format(type(ex).__name__, ex.args)
             message = fname+', line: '+str(line_no)+': '+message
             self.logger.error(message)
-            return ( 0.0, 0.0 )
+            return ( 0.0, 0.0, 1, 1 )
 
     def RunGnom(self, infile_name='/tmp/temp.dat', outfile_name='temp.out'):
         self.logger.info('Running datgnom and datporod')
@@ -325,7 +327,7 @@ class Subtraction(object):
         filelist_before = set(glob('*'))
         self.highq_signal = self.CalculateHighQSignal()
         if self.WriteDatFile():
-            self.rg, self.i_zero = self.RunAutoRg()
+            self.rg, self.i_zero, self.start_guinier, self.end_guinier = self.RunAutoRg()
             self.volume = self.RunGnom()
             self.mass = self.CalculateMass()
         else:
