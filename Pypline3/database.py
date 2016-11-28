@@ -31,23 +31,43 @@ class Database(object):
         #self.logger = myLogger(os.path.basename(__file__))
         self.logger = myLogger('database')
 
-        self.conn = sqlite3.connect(self.myconfig['setup']['database'])
-        self.cursor = self.conn.cursor()
-
-        if len(self.getTables()) == 0:
-            self.createDatabase()
+        self.database_name = None
+        self.conn = None
+        self.cursor = None
 
         ###define some parameters
         self.type = 'database'
 
+    def setDatabase(self, dbfile = None):
+        try:
+            if dbfile == self.database_name:
+                self.logger.debug('Using same database as last time, no change needed')
+            elif os.path.isdir(os.path.split(dbfile)[0]) and os.path.split(dbfile)[1][-2:] == 'db':
+                self.database_name = dbfile
+                self.conn = sqlite3.connect(self.database_name)
+                self.cursor = self.conn.cursor()
+            else:
+                raise IOError('database file '+str(dbfile)+' is not valid')
+        except Exception as ex:
+            self.database_name = self.myconfig['setup']['database']
+            self.conn = sqlite3.connect(self.database_name)
+            self.cursor = self.conn.cursor()
+            template = "An exception of type {0} occured. Arguments:{1!r}"
+            message = template.format(type(ex).__name__, ex.args)
+            self.logger.error(message)
+        
     def getTables(self):
-        return [header[0] for header in self.cursor.execute("select name from sqlite_master where type = 'table'").fetchall()]
+        if self.cursor:
+            return [header[0] for header in self.cursor.execute("select name from sqlite_master where type = 'table'").fetchall()]
+        else:
+            self.logger.error('Tried to get tables without first connecting to database')
 
     def createDatabase(self):
         try:
             schema_file = open(self.pypline_dir+'/schema.sql', 'r')
             schema = schema_file.read()
             self.cursor.executescript(schema)
+            self.logger.info('Created the database structure')
         except:
             self.logger.error('Failed to make the database')
             sys.exit('Failed to make the database')
@@ -121,7 +141,7 @@ class Database(object):
         try:
             return [x[0] for x in self.cursor.execute('SELECT visit_id FROM visit').fetchall()]
         except:
-            self.logger.error('failed to get the list of visits from the database')
+            self.logger.info('There were no visits in the database')
             return []
 
     def ReturnNextIndex(self, visit_object):
