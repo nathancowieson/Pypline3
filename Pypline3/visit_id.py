@@ -64,6 +64,12 @@ class VisitID(object):
             self.logger.error(message)
             return False        
 
+    def ReturnDatabaseFileName(self):
+        if self.ReturnYear() == False:
+            return False
+        else:
+            return str(self.myconfig['setup']['poll_dir']+str(self.ReturnYear())+'/'+str(self.ReturnVisitID()))+self.myconfig['settings']['dat_output_dir']+str(self.ReturnVisitID())+'.db'
+        
     def ReturnVisitDirectory(self, type=None):
         if self.ReturnYear() == False:
             return False
@@ -128,7 +134,7 @@ class VisitID(object):
 if __name__ == '__main__':
     job = VisitID()
     print 'current visit: '+str(job.ReturnVisitID())
-
+    print job.ReturnDatabaseFileName()
 
 
         
