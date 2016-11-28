@@ -40,10 +40,6 @@ samples = []
 #CONNECT TO THE SQLITE DATABASE
 database = Database()
 
-if not os.path.isfile(myconfig['setup']['database']):
-    log.info('no database found, starting a new one')
-    database.createDatabase()
-
 #AN OBJECT TO HANDLE AVERAGING AND SUBTRACTING
 dat_manager = DatManager()
 
@@ -62,7 +58,12 @@ while polling:
         visit = VisitID(options.visit_id)
         log.info('Visit ID was set manually to '+str(visit.ReturnVisitID()))
     visit.MakeOutputDirs()
-    
+
+    #CHECK AND/OR CREATE DATABASE FILE FOR THIS VISIT
+    database.setDatabase(visit.ReturnDatabaseFileName())
+    if len(database.getTables()) == 0:
+        database.createDatabase()
+
     #A VARIABLE FOR MAKING DECISIONS ABOUT ROBOT BUFFERS
     previous_scan_type = None
     
