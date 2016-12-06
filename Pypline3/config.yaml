@@ -5,6 +5,7 @@ setup:
     redis_host: localhost
     redis_port: 6379
     atsas_dir: '/dls_sw/apps/ATSAS/2.7.1'
+    index_at_end: False
 settings:
     dwell_time: 5.0
     number_digits_in_output_index: 5
@@ -14,6 +15,7 @@ settings:
     raw_dat_dir: raw_dat/
     av_dat_dir: av_dat/
     sub_dat_dir: sub_dat/
+    zip_dat_dir: zip_dat/
     unsub_dir_pre: b21-
     unsub_dir_post: .unsub
     visit_id_pv: BL21B-EA-EXPT-01:ID
