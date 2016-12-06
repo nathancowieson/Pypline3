@@ -142,15 +142,24 @@ class ParseNXS(object):
     def ReturnFilename(self, dat_type='raw_dat'):
         try:
             if dat_type == 'raw_dat':
-                return self.visit.ReturnVisitDirectory('raw_dat')+self.outfile_prefix+'_'+self.database.ReturnNextIndex(self.visit)+'.dat'
+                if self.myconfig['setup']['index_at_end']:
+                    return self.visit.ReturnVisitDirectory('raw_dat')+self.outfile_prefix+'_'+self.database.ReturnNextIndex(self.visit)+'.dat'
+                else:
+                    return self.visit.ReturnVisitDirectory('raw_dat')+self.database.ReturnNextIndex(self.visit)+'_'+self.outfile_prefix+'.dat'
             elif dat_type == 'av_dat':
                 first_index = self.database.ReturnNextIndex(self.visit)
                 last_index = '{index:{fill}{align}{width}}'.format(index=int(first_index)+self.number_of_exposures, fill='0', align='>', width=5)
-                return self.visit.ReturnVisitDirectory('av_dat')+self.outfile_prefix+'_'+first_index+'-'+last_index+'_av.dat'
+                if self.myconfig['setup']['index_at_end']:
+                    return self.visit.ReturnVisitDirectory('av_dat')+self.outfile_prefix+'_'+first_index+'-'+last_index+'_av.dat'
+                else:
+                    return self.visit.ReturnVisitDirectory('av_dat')+first_index+'-'+last_index+'_'+self.outfile_prefix+'_av.dat'
             elif dat_type == 'sub_dat':
                 first_index = self.database.ReturnNextIndex(self.visit)
                 last_index = '{index:{fill}{align}{width}}'.format(index=int(first_index)+self.number_of_exposures, fill='0', align='>', width=5)
-                return self.visit.ReturnVisitDirectory('sub_dat')+self.outfile_prefix+'_'+first_index+'-'+last_index+'_sub.dat'
+                if self.myconfig['setup']['index_at_end']:
+                    return self.visit.ReturnVisitDirectory('sub_dat')+self.outfile_prefix+'_'+first_index+'-'+last_index+'_sub.dat'
+                else:
+                    return self.visit.ReturnVisitDirectory('sub_dat')+first_index+'-'+last_index+'_'+self.outfile_prefix+'_sub.dat'
             else:
                 raise TypeError('nxs.ReturnFilename requires dat_type to be either raw_dat, av_dat or sub_dat')
         except Exception as ex:
