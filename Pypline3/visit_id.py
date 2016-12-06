@@ -81,6 +81,8 @@ class VisitID(object):
                 return str(self.myconfig['setup']['poll_dir']+str(self.ReturnYear())+'/'+str(self.ReturnVisitID()))+self.myconfig['settings']['dat_output_dir']+self.myconfig['settings']['av_dat_dir']
             elif type == 'sub_dat':
                 return str(self.myconfig['setup']['poll_dir']+str(self.ReturnYear())+'/'+str(self.ReturnVisitID()))+self.myconfig['settings']['dat_output_dir']+self.myconfig['settings']['sub_dat_dir']
+            elif type == 'zip_dat':
+                return str(self.myconfig['setup']['poll_dir']+str(self.ReturnYear())+'/'+str(self.ReturnVisitID()))+self.myconfig['settings']['dat_output_dir']+self.myconfig['settings']['zip_dat_dir']
             else:
                 return visit_dir
 
@@ -97,7 +99,7 @@ class VisitID(object):
         try:
             output_dir = self.ReturnVisitDirectory()+self.myconfig['settings']['dat_output_dir']
             if os.path.isdir(self.ReturnVisitDirectory()):
-                for mydir in ['', self.myconfig['settings']['raw_dat_dir'], self.myconfig['settings']['av_dat_dir'], self.myconfig['settings']['sub_dat_dir']]:
+                for mydir in ['', self.myconfig['settings']['raw_dat_dir'], self.myconfig['settings']['av_dat_dir'], self.myconfig['settings']['sub_dat_dir'], self.myconfig['settings']['zip_dat_dir']]:
                     if not self.MakeDirectory(output_dir+mydir):
                         raise IOError('Could not make the directory: '+output_dir+mydir)
             else:
