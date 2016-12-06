@@ -71,7 +71,7 @@ class DatManager(object):
                 ##    A NEW SEC BUFFER    ##
                 ############################
                 else:
-                    return_type = 'new buffer'
+                    return_type = 'new sec buffer'
 
             ############################
             ##     A SEC SAMPLE       ##
