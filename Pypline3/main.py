@@ -11,6 +11,7 @@ from raw_dat import RawDat
 from dat_manager import DatManager
 from averaging import Averaging
 from subtract import Subtraction
+from zippy import Zippy
 from optparse import OptionParser
 from optparse import OptionGroup
 import time
@@ -74,7 +75,10 @@ while polling:
     
     #CONNECT TO THE FILE SYSTEM
     files = PollFileSystem(visit)
-    
+
+    #START AN OBJECT FOR MANAGING THE ZIP DIRECTORY OUTPUT
+    zippy = Zippy()
+
     #PARSE THE NEW NXS FILES
     nxsfiles = sorted( list( set(files.ReturnNxsFiles()) - set(database.ReturnVisitNxsFiles(visit)) ) )
     for nxsfile in nxsfiles:
@@ -87,8 +91,18 @@ while polling:
                 database.SaveDatFile(parsednxs.dat_data[-1].OutputDatDictForFile())       # save and database the raw
                 database.insertData(parsednxs.ReturnSQLDict(datfile))                     # individual dat files
             kind_of_sample = dat_manager.AddParsedNXS(parsednxs)
+
             if kind_of_sample == 'new buffer':
                 log.info('New buffer detected, clearing buffer and sample arrays.')
+                buffers = Averaging()
+                samples = []
+                buffers.AddParsedNXS(parsednxs)
+
+            elif kind_of_sample == 'new sec buffer':
+                #start a new zip file and add the raw dats to it
+                zippy.Reset()
+                zippy.AddParsednxs(parsednxs)
+                log.info('New sec buffer detected, clearing buffer and sample arrays.')
                 buffers = Averaging()
                 samples = []
                 buffers.AddParsedNXS(parsednxs)
@@ -141,12 +155,14 @@ while polling:
     
             elif kind_of_sample == 'repeat sec buffer': 
                 log.info('Repeat SEC buffer detected, added to buffers in memory')
+                zippy.AddParsednxs(parsednxs)
                 if buffers.TestSimilar(parsednxs.dat_data[0].ReturnColumn('I')):
                     buffers.AddParsedNXS(parsednxs)
                     buffers.LimitToWindowSize()
     
             elif kind_of_sample == 'new sec sample':
                 log.info('found a new SEC sample')
+                zippy.AddParsednxs(parsednxs)
                 #average the buffers
                 log.info('dealing with buffers first')
                 buffers.RejectOutliers()
