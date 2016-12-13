@@ -1,4 +1,3 @@
-#!/home/b21user/nathanc/Pypline3/bin/python
 '''
 Created on Aug 24th, 2016
 

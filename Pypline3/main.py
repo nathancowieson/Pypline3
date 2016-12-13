@@ -1,4 +1,4 @@
-#!/home/b21user/nathanc/Pypline3/bin/python
+#!/dls/science/groups/b21/PYTHON/bin/python
 import os.path
 import yaml
 import sys

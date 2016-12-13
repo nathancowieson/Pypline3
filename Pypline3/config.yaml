@@ -1,6 +1,6 @@
 setup:
-    database: /home/b21user/nathanc/Pypline3/db/pypline3.db
-    logfile: /home/b21user/nathanc/Pypline3/logs/Pypline3.log
+    database: /dls/science/groups/b21/PYTHON/packages/Pypline3/db/pypline3.db
+    logfile: /dls/science/groups/b21/PYTHON/packages/Pypline3/logs/Pypline3.log
     poll_dir: /dls/b21/data/
     redis_host: localhost
     redis_port: 6379
