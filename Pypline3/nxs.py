@@ -77,25 +77,29 @@ class ParseNXS(object):
                 mynxs = nxload(self.nexus_file)
                 self.scan_command = str(mynxs.entry1.scan_command.nxdata)
                 self.file_code = int(mynxs.entry1.entry_identifier.nxdata)
-                self.dat_dir = os.path.dirname(self.nexus_file)+'/'+self.myconfig['settings']['existing_dat_file_directory']+'/'+self.myconfig['settings']['unsub_dir_pre']+str(self.file_code)+self.myconfig['settings']['unsub_dir_post']+'/'
-                self.file_time = dateutil.parser.parse(mynxs.file_time).strftime('%Y/%m/%d_%H:%M:%S')
+                self.dat_dir = os.path.dirname(self.nexus_file)+'/'+self.myconfig['settings']['existing_dat_file_directory']+'/'
+                self.file_time = datetime.fromtimestamp(os.path.getmtime(nexus_file)).strftime('%Y/%m/%d_%H:%M:%S')
+
                 self.visit_id = str(mynxs.entry1.experiment_identifier.nxdata)
                 if self.scan_command == 'static readout':
-                    self.descriptive_title = str(mynxs.entry1.title.nxdata)
-                    if re.search(self.hplc_pattern, self.descriptive_title):
-                        self.descriptive_title = self.descriptive_title[re.search(self.hplc_pattern, self.descriptive_title).end():]
-                        self.scan_type = 'SEC Buffer'
-                        if re.search(self.hplc_sample_pattern, self.descriptive_title):
-                            self.scan_type = 'SEC Sample'
-                    elif re.search(self.robot_buffer_pattern, self.descriptive_title):
+                    m = re.match(r"(Sample: )(.*)( \(Location.*\))", str(mynxs.entry1.title.nxdata))
+                    if m:
+                        descriptive_title = m.group(2)
+                    else:
+                        descriptive_title = str(mynxs.entry1.title.nxdata)
+                         
+                    self.descriptive_title = self.MakeSafeFilename(descriptive_title)
+                    if str(mynxs.entry1.environment.type) == 'BSSC' and str(mynxs.entry1.sample.type) == 'buffer':
                         self.scan_type = 'Robot Buffer'
-                    elif re.search(self.robot_sample_pattern_start, self.descriptive_title) and re.search(self.robot_sample_pattern_end, self.descriptive_title):
-                        start_index = re.search(self.robot_sample_pattern_start, self.descriptive_title).end()
-                        end_index = re.search(self.robot_sample_pattern_end, self.descriptive_title).start()
-                        self.descriptive_title = self.descriptive_title[start_index:end_index]
+                    elif str(mynxs.entry1.environment.type) == 'BSSC' and str(mynxs.entry1.sample.type) == 'sample+buffer':
                         self.scan_type = 'Robot Sample'
+                    elif str(mynxs.entry1.environment.type) == 'HPLC' and str(mynxs.entry1.sample.type) == 'buffer':
+                        self.scan_type = 'SEC Buffer'
+                    elif str(mynxs.entry1.environment.type) == 'HPLC' and str(mynxs.entry1.sample.type) == 'sample+buffer':
+                        self.scan_type = 'SEC Sample'
                     else:
                         self.scan_type = 'Manual'
+
 
                     self.outfile_prefix = self.MakeSafeFilename(self.descriptive_title)
                     self.number_of_exposures = int(mynxs.entry1.instrument.detector.count_time.size) 
@@ -169,8 +173,8 @@ class ParseNXS(object):
     def ReturnDatFiles(self):
         dat_file_array = []
         if self.scan_command == 'static readout':
-            for file_index in range(0,self.number_of_exposures):
-                dat_file_array.append(self.dat_dir+self.myconfig['settings']['unsub_dir_pre']+str(self.file_code)+'_sample_'+str(file_index)+'.dat')
+            for file_index in range(1,self.number_of_exposures+1):
+                dat_file_array.append(self.dat_dir+self.myconfig['settings']['unsub_dir_pre']+str(self.file_code)+'_'+str(file_index).zfill(int(self.myconfig['settings']['number_digits_in_output_index']))+'.dat')
         return dat_file_array
 
     def WaitForDatFiles(self):
