@@ -50,6 +50,7 @@ class ParseNXS(object):
             self.logger.error(message)
             
         self.type = 'nxs'
+        self.success = False
         self.hplc_pattern = re.compile('\ASECSAXS ')
         self.hplc_sample_pattern = re.compile(' Peak [0-9]+\Z')
         self.robot_sample_pattern_start = re.compile('\ASample: ')
@@ -104,12 +105,14 @@ class ParseNXS(object):
                     self.outfile_prefix = self.MakeSafeFilename(self.descriptive_title)
                     self.number_of_exposures = int(mynxs.entry1.instrument.detector.count_time.size) 
                     self.exposure_time = float(mynxs.entry1.instrument.detector.count_time[0][0])
+                    self.success = True
             except:
                 self.logger.error('nxs file: '+str(self.nexus_file)+' could not be parsed')
                 self.descriptive_title = 'ERROR IN NXS FILE'
                 self.scan_type = 'Error'
                 self.file_time = datetime.strftime(datetime.now(), '%Y/%m/%d_%H:%M:%S')
                 self.visit_id = self.visit.ReturnVisitID()
+                self.success = False
         except Exception as ex:
             template = "An exception of type {0} occured. {1!r}"
             message = template.format(type(ex).__name__, ex.args)
