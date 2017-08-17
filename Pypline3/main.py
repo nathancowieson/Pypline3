@@ -85,113 +85,118 @@ while polling:
         parsednxs = ParseNXS(database, visit, nxsfile)
         log.info('------------NEW NXS: '+str(nxsfile)+'------------')
         database.insertData(parsednxs.ReturnSQLDict('nxs'))
-        if parsednxs.WaitForDatFiles():
-            for datfile in parsednxs.ReturnDatFiles():
-                parsednxs.AddDatData(RawDat(datfile))
-                database.SaveDatFile(parsednxs.dat_data[-1].OutputDatDictForFile())       # save and database the raw
-                database.insertData(parsednxs.ReturnSQLDict(datfile))                     # individual dat files
-            kind_of_sample = dat_manager.AddParsedNXS(parsednxs)
+        if parsednxs.success:
+            log.info('Nxs parse successful, waiting on dat files')
+            if parsednxs.WaitForDatFiles():
+                log.info('Found the dat files')
+                for datfile in parsednxs.ReturnDatFiles():
+                    parsednxs.AddDatData(RawDat(datfile))
+                    database.SaveDatFile(parsednxs.dat_data[-1].OutputDatDictForFile())           # save and database the raw
+                    database.insertData(parsednxs.ReturnSQLDict(datfile))                         # individual dat files
+                kind_of_sample = dat_manager.AddParsedNXS(parsednxs)
 
-            if kind_of_sample == 'new buffer':
-                log.info('New buffer detected, clearing buffer and sample arrays.')
-                buffers = Averaging()
-                samples = []
-                buffers.AddParsedNXS(parsednxs)
+                if kind_of_sample == 'new buffer':
+                    log.info('New buffer detected, clearing buffer and sample arrays.')
+                    buffers = Averaging()
+                    samples = []
+                    buffers.AddParsedNXS(parsednxs)
 
-            elif kind_of_sample == 'new sec buffer':
-                #start a new zip file and add the raw dats to it
-                zippy.Reset()
-                zippy.AddParsednxs(parsednxs)
-                log.info('New sec buffer detected, clearing buffer and sample arrays.')
-                buffers = Averaging()
-                samples = []
-                buffers.AddParsedNXS(parsednxs)
+                elif kind_of_sample == 'new sec buffer':
+                    #start a new zip file and add the raw dats to it
+                    zippy.Reset()
+                    zippy.AddParsednxs(parsednxs)
+                    log.info('New sec buffer detected, clearing buffer and sample arrays.')
+                    buffers = Averaging()
+                    samples = []
+                    buffers.AddParsedNXS(parsednxs)
     
-            elif kind_of_sample == 'repeat robot buffer':
-                log.info('Repeat robot buffer detected')
-                buffers.AddParsedNXS(parsednxs)
-                if len(samples) > 0:
+                elif kind_of_sample == 'repeat robot buffer':
+                    log.info('Repeat robot buffer detected')
+                    buffers.AddParsedNXS(parsednxs)
+                    if len(samples) > 0:
+                        #average the buffers
+                        buffers.RejectOutliers()
+                        av_buffer = buffers.Average()
+                        database.insertData(av_buffer[1])
+                        database.SaveDatFile(av_buffer[0])
+                        #average the samples
+                        for sample in samples:
+                            sample.RejectOutliers()
+                            av_sample = sample.Average()
+                            database.insertData(av_sample[1])
+                            database.SaveDatFile(av_sample[0])
+                            #subtract new buffer from sample
+                            subtraction = Subtraction()
+                            subtraction.AddSample(sample)
+                            subtraction.AddBuffer(buffers)
+                            sub_sample = subtraction.Subtract()
+                            database.insertData(sub_sample[1])
+                            database.SaveDatFile(sub_sample[0])
+    
+                elif kind_of_sample == 'new robot sample':
+                    log.info('found a robot sample')
                     #average the buffers
                     buffers.RejectOutliers()
                     av_buffer = buffers.Average()
                     database.insertData(av_buffer[1])
                     database.SaveDatFile(av_buffer[0])
-                    #average the samples
-                    for sample in samples:
-                        sample.RejectOutliers()
-                        av_sample = sample.Average()
-                        database.insertData(av_sample[1])
-                        database.SaveDatFile(av_sample[0])
-                        #subtract new buffer from sample
-                        subtraction = Subtraction()
-                        subtraction.AddSample(sample)
-                        subtraction.AddBuffer(buffers)
-                        sub_sample = subtraction.Subtract()
-                        database.insertData(sub_sample[1])
-                        database.SaveDatFile(sub_sample[0])
+                    #average THIS sample
+                    sample = Averaging()
+                    sample.AddParsedNXS(parsednxs)
+                    samples.append(sample)
+                    sample.RejectOutliers()
+                    av_sample = sample.Average()
+                    database.insertData(av_sample[1])
+                    database.SaveDatFile(av_sample[0])
+                    #subtract THIS sample
+                    subtraction = Subtraction()
+                    subtraction.AddSample(sample)
+                    subtraction.AddBuffer(buffers)
+                    sub_sample = subtraction.Subtract()
+                    database.insertData(sub_sample[1])
+                    database.SaveDatFile(sub_sample[0])
     
-            elif kind_of_sample == 'new robot sample':
-                log.info('found a robot sample')
-                #average the buffers
-                buffers.RejectOutliers()
-                av_buffer = buffers.Average()
-                database.insertData(av_buffer[1])
-                database.SaveDatFile(av_buffer[0])
-                #average THIS sample
-                sample = Averaging()
-                sample.AddParsedNXS(parsednxs)
-                samples.append(sample)
-                sample.RejectOutliers()
-                av_sample = sample.Average()
-                database.insertData(av_sample[1])
-                database.SaveDatFile(av_sample[0])
-                #subtract THIS sample
-                subtraction = Subtraction()
-                subtraction.AddSample(sample)
-                subtraction.AddBuffer(buffers)
-                sub_sample = subtraction.Subtract()
-                database.insertData(sub_sample[1])
-                database.SaveDatFile(sub_sample[0])
+                elif kind_of_sample == 'repeat sec buffer': 
+                    log.info('Repeat SEC buffer detected, added to buffers in memory')
+                    zippy.AddParsednxs(parsednxs)
+                    if buffers.TestSimilar(parsednxs.dat_data[0].ReturnColumn('I')):
+                        buffers.AddParsedNXS(parsednxs)
+                        buffers.LimitToWindowSize()
     
-            elif kind_of_sample == 'repeat sec buffer': 
-                log.info('Repeat SEC buffer detected, added to buffers in memory')
-                zippy.AddParsednxs(parsednxs)
-                if buffers.TestSimilar(parsednxs.dat_data[0].ReturnColumn('I')):
-                    buffers.AddParsedNXS(parsednxs)
-                    buffers.LimitToWindowSize()
+                elif kind_of_sample == 'new sec sample':
+                    log.info('found a new SEC sample')
+                    zippy.Reset()
+                    zippy.AddParsednxs(parsednxs)
+                    #average the buffers
+                    #log.info('dealing with buffers first')
+                    #buffers.RejectOutliers()
+                    #av_buffer = buffers.Average()
+                    #database.insertData(av_buffer[1])
+                    #database.SaveDatFile(av_buffer[0])
+                    #average THIS sample
+                    #log.info('now dealing with sample')
+                    #sample = Averaging()
+                    #sample.AddParsedNXS(parsednxs)
+                    #sample.RejectOutliers()
+                    #av_sample = sample.Average()
+                    #database.insertData(av_sample[1])
+                    #database.SaveDatFile(av_sample[0])
+                    #subtract EACH INDIVIDUAL dat file in THIS nxs
+                    #log.info('now subtracting buffer from sample')
+                    #subtraction = Subtraction()
+                    #subtraction.AddSample(sample)
+                    #subtraction.AddBuffer(buffers)
+                    #sub_sample = subtraction.Subtract()
+                    #database.insertData(sub_sample[1])
+                    #database.SaveDatFile(sub_sample[0])
     
-            elif kind_of_sample == 'new sec sample':
-                log.info('found a new SEC sample')
-                zippy.Reset()
-                zippy.AddParsednxs(parsednxs)
-                #average the buffers
-                #log.info('dealing with buffers first')
-                #buffers.RejectOutliers()
-                #av_buffer = buffers.Average()
-                #database.insertData(av_buffer[1])
-                #database.SaveDatFile(av_buffer[0])
-                #average THIS sample
-                #log.info('now dealing with sample')
-                #sample = Averaging()
-                #sample.AddParsedNXS(parsednxs)
-                #sample.RejectOutliers()
-                #av_sample = sample.Average()
-                #database.insertData(av_sample[1])
-                #database.SaveDatFile(av_sample[0])
-                #subtract EACH INDIVIDUAL dat file in THIS nxs
-                #log.info('now subtracting buffer from sample')
-                #subtraction = Subtraction()
-                #subtraction.AddSample(sample)
-                #subtraction.AddBuffer(buffers)
-                #sub_sample = subtraction.Subtract()
-                #database.insertData(sub_sample[1])
-                #database.SaveDatFile(sub_sample[0])
-    
-            elif kind_of_sample == 'manual collection or scan':
-                log.info('manual collection or scan detected, will ignore')
+                elif kind_of_sample == 'manual collection or scan':
+                    log.info('manual collection or scan detected, will ignore')
+                else:
+                    log.error('AddParsedNXS returned something unexpected')
             else:
-                log.error('AddParsedNXS returned something unexpected')
-    
+                log.info(', '.join(parsednxs.ReturnDatFiles()))
+                log.error('Dat files were not in found within wait time')
         
     if len(nxsfiles) == 0:
         log.info('Polled fileserver, no new files')
