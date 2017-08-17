@@ -41,12 +41,14 @@ class DatManager(object):
             ############################
             ##    A ROBOT BUFFER      ##
             ############################
-            if parsednxs.scan_type == 'Robot Buffer': 
-                if self.previous_scan_type == 'Robot Sample': #A BUFFER AFTER A ROBOT SAMPLE MEANS A REPEAT BUFFER
-                    self.logger.info('dat_manager detected a repeat robot buffer')
-                    return_type = 'repeat robot buffer'
-                else: #A ROBOT BUFFER AFTER ANYTHING BUT A ROBOT SAMPLE IS A NEW BUFFER
-                    self.logger.info('dat_manager detected a new robot buffer')
+            if parsednxs.scan_type == 'Robot Buffer':
+                #return_type = 'repeat robot buffer'
+                ### SINCE USERS SPECIFY RUN ORDER THE WAY OF RECOGNISING REPEAT BUFFERS HAS BEEN FAILING, THIS IS A TEMP FIX 
+                #if self.previous_scan_type == 'Robot Sample': #A BUFFER AFTER A ROBOT SAMPLE MEANS A REPEAT BUFFER
+                #    self.logger.info('dat_manager detected a repeat robot buffer')
+                #    return_type = 'repeat robot buffer'
+                #else: #A ROBOT BUFFER AFTER ANYTHING BUT A ROBOT SAMPLE IS A NEW BUFFER
+                #    self.logger.info('dat_manager detected a new robot buffer')
                     return_type = 'new buffer'
 
             ############################
