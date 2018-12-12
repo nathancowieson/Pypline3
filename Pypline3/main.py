@@ -15,6 +15,32 @@ from zippy import Zippy
 from optparse import OptionParser
 from optparse import OptionGroup
 import time
+from nexusformat import nexus as nx
+import json
+
+#A FUNCTION TO TELL IF SUBDIRS ARE TURNED ON IN THE PROCESSING PIPELINE
+#THIS HAS AN EFFECT ON WHERE THE ParseNXS CLASS LOOKS FOR DAT FILES
+def returnAreSubdirs(visit_obj=None, default=True):
+    returnValue = default
+    try:
+        pipeline_file = json.loads(open(visit.ReturnVisitDirectory()+'/xml/templates/template.json', 'r').read())['processingPath']
+        mynxs = nx.tree.NXFile(pipeline_file, 'r')
+        tree = mynxs.readfile()
+        for item in tree.entry.process._entries.iteritems():
+            try:
+                if item[1].name.nxdata == u'Export to Text File':
+                    mydata = json.loads(item[1].data.nxdata)
+            except:
+                pass
+        returnValue = mydata['makeFolder']
+        if returnValue:
+            log.info('Subdirs are switched on for file output in the processing pipeline')
+        else:
+            log.info('Subdirs are switched off for file output in the processing pipeline')
+    except:
+        log.error('Could not get from pipeline file if there are subdirectories, using default: '+str(default))
+    return returnValue
+
 
 
 #START A LOG FILE
@@ -37,12 +63,23 @@ with open(pypline_dir+'/config.yaml', 'r') as ymlfile:
 #SET SOME PARAMETERS
 buffers = Averaging()
 samples = []
+previous_visit = None
+subdirs = True
 
 #CONNECT TO THE SQLITE DATABASE
 database = Database()
 
 #AN OBJECT TO HANDLE AVERAGING AND SUBTRACTING
 dat_manager = DatManager()
+
+#AN OBJECT TO HANDLE THE VISIT
+if options.visit_id == 'None':
+    visit = VisitID()
+    log.info('Visit automatically set to '+str(visit.ReturnVisitID()))
+else:
+    visit = VisitID(options.visit_id)
+    log.info('Visit ID was set manually to '+str(visit.ReturnVisitID()))
+
 
 polling = 1
 while polling:
@@ -51,14 +88,12 @@ while polling:
         log.info('Not polling, will run through once and stop')
         polling = 0
 
-    #DEFINE THE VISIT
-    if options.visit_id == 'None':
-        visit = VisitID()
-        log.info('Visit automatically set to '+str(visit.ReturnVisitID()))
-    else:
-        visit = VisitID(options.visit_id)
-        log.info('Visit ID was set manually to '+str(visit.ReturnVisitID()))
-    visit.MakeOutputDirs()
+    #CHECK CHANGES IN VISIT
+    if not previous_visit == visit.ReturnVisitID():
+        log.info('Visit changed from: '+str(previous_visit)+' to: '+visit.ReturnVisitID())
+        visit.MakeOutputDirs()
+        previous_visit = visit.ReturnVisitID()
+        subdirs = returnAreSubdirs(visit)
 
     #CHECK AND/OR CREATE DATABASE FILE FOR THIS VISIT
     database.setDatabase(visit.ReturnDatabaseFileName())
@@ -85,9 +120,17 @@ while polling:
         parsednxs = ParseNXS(database, visit, nxsfile)
         log.info('------------NEW NXS: '+str(nxsfile)+'------------')
         database.insertData(parsednxs.ReturnSQLDict('nxs'))
+        tries = 0
+        while tries < 4:
+            if parsednxs.success:
+                break
+            else:
+                tries += 1
+                time.sleep(5)
+                log.error('NXS file failed to parse, waiting 5 seconds')
         if parsednxs.success:
             log.info('Nxs parse successful, waiting on dat files')
-            if parsednxs.WaitForDatFiles():
+            if parsednxs.WaitForDatFiles(subdirs):
                 log.info('Found the dat files')
                 for datfile in parsednxs.ReturnDatFiles():
                     parsednxs.AddDatData(RawDat(datfile))
@@ -199,7 +242,9 @@ while polling:
                 log.error('Dat files were not in found within wait time')
         
     if len(nxsfiles) == 0:
-        log.info('Polled fileserver, no new files')
+        log.debug('Polled fileserver, no new files')
         time.sleep(10)
     
 log.info('Pypline terminated cleanly')
+
+        
