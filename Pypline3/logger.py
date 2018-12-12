@@ -38,7 +38,7 @@ class myLogger(object):
         if len(self.logger.handlers) == 0:
             self.logger.addHandler(filehandler)
             self.logger.addHandler(streamhandler)
-        self.logger.info('Log file was reinitiated')
+        self.logger.debug('Log file was reinitiated')
 
     def info(self, message='info log entry with no message'):
         self.logger.info(message)
