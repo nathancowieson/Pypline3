@@ -143,6 +143,19 @@ class Database(object):
             self.logger.info('There were no visits in the database')
             return []
 
+    def removeNxsFile(self, nxsfile_fullpath, visit_object):
+        if str(nxsfile_fullpath) in self.ReturnVisitNxsFiles(visit_object):
+            try:
+                self.cursor.execute( 'DELETE FROM nxs WHERE nxs_file=?', (nxsfile_fullpath,) )
+                self.conn.commit()
+                return True
+            except:
+                self.logger.error('Failed to delete '+str(nxsfile_fullpath)+' from table nxs in the database')
+                return False
+        else:
+            self.logger.error('nxs file: '+str(nxsfile_fullpath)+' is not in the database')
+            return False
+            
     def ReturnNextIndex(self, visit_object):
         index = len([x[0] for x in self.cursor.execute('SELECT rawdat_file FROM raw_dat INNER JOIN nxs ON nxs.nxs_file = raw_dat.nxs_file WHERE visit_id = ?', (visit_object.ReturnVisitID(),)).fetchall()])+1
         return '{index:{fill}{align}{width}}'.format(index=index, fill='0', align='>', width=int(self.myconfig['settings']['number_digits_in_output_index']))
