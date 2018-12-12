@@ -76,6 +76,7 @@ class ParseNXS(object):
                 raise IOError(str(self.nexus_file)+' does not exist or is not of type .nxs')
             try:
                 mynxs = nxload(self.nexus_file)
+                    
                 self.scan_command = str(mynxs.entry1.scan_command.nxdata)
                 self.file_code = int(mynxs.entry1.entry_identifier.nxdata)
                 self.dat_dir = os.path.dirname(self.nexus_file)+'/'+self.myconfig['settings']['existing_dat_file_directory']+'/'
@@ -173,19 +174,23 @@ class ParseNXS(object):
             message = template.format(type(ex).__name__, ex.args)
             self.logger.error(message)
 
-    def ReturnDatFiles(self):
+    def ReturnDatFiles(self, subfolders=True):
         dat_file_array = []
         if self.scan_command == 'static readout':
-            for file_index in range(1,self.number_of_exposures+1):
-                dat_file_array.append(self.dat_dir+self.myconfig['settings']['unsub_dir_pre']+str(self.file_code)+'_'+str(file_index).zfill(int(self.myconfig['settings']['number_digits_in_output_index']))+'.dat')
+            for file_index in range(0,self.number_of_exposures):
+                if subfolders:
+                    dat_file_array.append(self.dat_dir+self.myconfig['settings']['unsub_dir_pre']+str(self.file_code)+'_ascii/'+self.myconfig['settings']['unsub_dir_pre']+str(self.file_code)+'_'+str(file_index).zfill(int(self.myconfig['settings']['number_digits_in_output_index']))+'.dat')
+                else:
+                    dat_file_array.append(self.dat_dir+self.myconfig['settings']['unsub_dir_pre']+str(self.file_code)+'_'+str(file_index).zfill(int(self.myconfig['settings']['number_digits_in_output_index']))+'.dat')
         return dat_file_array
 
-    def WaitForDatFiles(self):
+    def WaitForDatFiles(self, subfolders=True):
         once_through = False
         while (datetime.now() - datetime.strptime(self.file_time,'%Y/%m/%d_%H:%M:%S')).seconds < self.myconfig['settings']['time_out_time'] or not once_through:
             once_through = True
             all_present = True
-            for file in self.ReturnDatFiles():
+            for file in self.ReturnDatFiles(subfolders):
+                self.logger.info('waiting for '+file)
                 if not os.path.isfile(file):
                     all_present = False
                     break
